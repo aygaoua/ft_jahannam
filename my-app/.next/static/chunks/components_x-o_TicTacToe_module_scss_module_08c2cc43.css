@@ -1,0 +1,149 @@
+@import "https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap";
+/* [project]/components/x-o/TicTacToe.module.scss.module.css [app-client] (css) */
+.TicTacToe-module-scss-module__0CIipa__container {
+  text-align: center;
+  color: #fff;
+  background-color: #000;
+  border: 6px solid #fff;
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  font-family: "Press Start 2P", cursive;
+  box-shadow: 0 0 20px #ffffff4d;
+}
+
+.TicTacToe-module-scss-module__0CIipa__title {
+  text-shadow: 0 0 10px #fff;
+  letter-spacing: 2px;
+  margin-bottom: 2rem;
+  font-size: 2.5rem;
+}
+
+.TicTacToe-module-scss-module__0CIipa__status {
+  text-shadow: 0 0 5px #fff;
+  min-height: 36px;
+  margin: 2rem 0;
+  font-size: 1.5rem;
+}
+
+.TicTacToe-module-scss-module__0CIipa__board {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 500px;
+  height: 500px;
+  margin: 2rem auto;
+  display: grid;
+}
+
+.TicTacToe-module-scss-module__0CIipa__cell {
+  cursor: pointer;
+  aspect-ratio: 1;
+  background-color: #000;
+  border: 3px solid #fff;
+  min-height: 0;
+  padding: 0;
+  transition: all .2s;
+  position: relative;
+}
+
+.TicTacToe-module-scss-module__0CIipa__cell:hover:not(:disabled) {
+  background-color: #ffffff1a;
+}
+
+.TicTacToe-module-scss-module__0CIipa__cell:disabled {
+  cursor: not-allowed;
+}
+
+.TicTacToe-module-scss-module__0CIipa__cell span {
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 5rem;
+  line-height: 1;
+  display: flex;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.TicTacToe-module-scss-module__0CIipa__cell.TicTacToe-module-scss-module__0CIipa__winningCell span {
+  color: #ff0;
+  text-shadow: 0 0 15px #ff0;
+  animation: .5s infinite alternate TicTacToe-module-scss-module__0CIipa__pulse;
+}
+
+.TicTacToe-module-scss-module__0CIipa__resetButton {
+  color: #fff;
+  cursor: pointer;
+  text-transform: uppercase;
+  background-color: #000;
+  border: 3px solid #fff;
+  margin-top: 2rem;
+  padding: 1rem 2rem;
+  font-family: inherit;
+  font-size: 1.2rem;
+  transition: all .3s;
+}
+
+.TicTacToe-module-scss-module__0CIipa__resetButton:hover {
+  color: #000;
+  background-color: #fff;
+  transform: scale(1.05);
+}
+
+@keyframes TicTacToe-module-scss-module__0CIipa__pulse {
+  from {
+    opacity: .8;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.TicTacToe-module-scss-module__0CIipa__container:after {
+  content: "";
+  pointer-events: none;
+  z-index: -1;
+  background: repeating-linear-gradient(0deg, #000c, #000c 1px, #0000 1px 2px);
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+@media (width <= 600px) {
+  .TicTacToe-module-scss-module__0CIipa__container {
+    max-width: 95%;
+    padding: 1rem;
+  }
+
+  .TicTacToe-module-scss-module__0CIipa__title {
+    font-size: 1.8rem;
+  }
+
+  .TicTacToe-module-scss-module__0CIipa__board {
+    width: 90vw;
+    max-width: 400px;
+    height: 90vw;
+    max-height: 400px;
+  }
+
+  .TicTacToe-module-scss-module__0CIipa__cell span {
+    font-size: 4rem;
+  }
+
+  .TicTacToe-module-scss-module__0CIipa__status {
+    font-size: 1.2rem;
+  }
+
+  .TicTacToe-module-scss-module__0CIipa__resetButton {
+    padding: .8rem 1.5rem;
+    font-size: 1rem;
+  }
+}
+
+
+/*# sourceMappingURL=components_x-o_TicTacToe_module_scss_module_08c2cc43.css.map*/
