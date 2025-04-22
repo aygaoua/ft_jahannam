@@ -15,9 +15,9 @@ const TicTacToe = () => {
   }, []);
 
   const winningCombos = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-    [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
-    [0, 4, 8], [2, 4, 6]             // diagonals
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
   ];
 
   if (!isMounted) return <div className={styles.container} />;
@@ -66,7 +66,7 @@ const TicTacToe = () => {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>RETRO TIC-TAC-TOE</h1>
+      <h1 className={styles.title}>TIC-TAC-TOE</h1>
       <div className={styles.status}>
         {winner
           ? winner === 'D' ? 'It\'s a draw!' : ` Player ${winner} wins!`
@@ -78,7 +78,7 @@ const TicTacToe = () => {
       </div>
 
       <button className={styles.resetButton} onClick={resetBoard}>
-        Rematch
+        REMATCH
       </button>
     </div>
   );
