@@ -66,7 +66,7 @@ const TicTacToe = () => {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>TIC-TAC-TOE</h1>
+      <h1 className={styles.title}>TIC-TAC-TOE M3ASSBA</h1>
       <div className={styles.status}>
         {winner
           ? winner === 'D' ? 'It\'s a draw!' : ` Player ${winner} wins!`
