@@ -1,7 +1,6 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import styles from './TicTacToe.module.scss';
+import Form from '../Form';
 
 const TicTacToe = () => {
   const [isMounted, setIsMounted] = useState(false);
@@ -9,6 +8,7 @@ const TicTacToe = () => {
   const [player, setPlayer] = useState('X');
   const [winner, setWinner] = useState(null);
   const [highlightedCells, setHighlightedCells] = useState([]);
+  const username = localStorage.getItem('username') || player;
 
   useEffect(() => {
     setIsMounted(true);
@@ -70,7 +70,7 @@ const TicTacToe = () => {
       <div className={styles.status}>
         {winner
           ? winner === 'D' ? 'It\'s a draw!' : ` Player ${winner} wins!`
-          : `Player ${player}'s turn`}
+          : `Player ${username}'s turn`}
       </div>
 
       <div className={styles.board}>
