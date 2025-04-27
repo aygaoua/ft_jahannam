@@ -79,6 +79,14 @@ function Form({ route, method }) {
         setLoading(true);
         setError("");
         e.preventDefault();
+        
+        if (!username || !password) {
+            setError("PLEASE COMPLETE ALL FIELDS!");
+            const audio = new Audio('/sounds/error1.wav');
+            audio.play().catch(() => {});
+            setLoading(false);
+            return;
+        }
 
         try {
             const res = await api.post(route, { username, password });
@@ -117,7 +125,6 @@ function Form({ route, method }) {
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             placeholder="ENTER USERNAME"
-                            required
                         />
                     </div>
                     
@@ -129,7 +136,6 @@ function Form({ route, method }) {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="ENTER PASSWORD"
-                            required
                         />
                     </div>
                     
