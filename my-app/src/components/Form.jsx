@@ -91,9 +91,9 @@ function Form({ route, method }) {
         try {
             const res = await api.post(route, { username, password });
             if (method === "login") {
-                localStorage.setItem(ACCESS_TOKEN, res.data.access);
-                localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-                localStorage.setItem("username", username);
+                sessionStorage.setItem(ACCESS_TOKEN, res.data.access);
+                sessionStorage.setItem(REFRESH_TOKEN, res.data.refresh);
+                sessionStorage.setItem("username", username);
                 navigate("/tictactoe");
             } else {
                 navigate("/login");
