@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import TicTacToe from './components/tictactoe/TicTacToe';
 import Matchmaking from './components/Matchmaking';
 import Login from './pages/Login';
@@ -8,41 +8,50 @@ import Home from './pages/Home';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/ProtectedRoute';
 
+// Component to handle logout
 function Logout() {
   sessionStorage.clear();
   return <Navigate to="/login" />;
 }
 
+// Component to handle register (with logout)
 function RegisterAndLogout() {
   sessionStorage.clear();
   return <Register />;
 }
 
-// ✅ Correct hook usage inside functional component
-function AppRoutes() {
-  const navigate = useNavigate();
-  const navigateToGame = (room) => {
-    navigate(`/tictactoe?room=${room}`);
-  };
-
-  return (
-    <Routes>
-      <Route path="/tictactoe" element={<ProtectedRoute><TicTacToe /></ProtectedRoute>} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/logout" element={<Logout />} />
-      <Route path="/register" element={<RegisterAndLogout />} />
-      <Route path="/matchmaking" element={<Matchmaking onMatchFound={navigateToGame} />} />
-      
-      <Route path="/" element={<Home />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-}
-
+// Main App component
 function App() {
   return (
     <BrowserRouter>
-      <AppRoutes />
+      <Routes>
+        {/* Game routes */}
+        <Route 
+          path="/tictactoe" 
+          element={
+            <ProtectedRoute>
+              <TicTacToe />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/matchmaking" 
+          element={
+            <ProtectedRoute>
+              <Matchmaking />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Auth routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/logout" element={<Logout />} />
+        <Route path="/register" element={<RegisterAndLogout />} />
+        
+        {/* Other routes */}
+        <Route path="/" element={<Home />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </BrowserRouter>
   );
 }

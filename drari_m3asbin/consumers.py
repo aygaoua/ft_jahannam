@@ -227,6 +227,6 @@ class TicTacToeConsumer(AsyncWebsocketConsumer):
             [0, 4, 8], [2, 4, 6]
         ]
         for a, b, c in combos:
-            if board[a] and board[a] == board[b] == board[a] == board[c]:
+            if board[a] and board[a] == board[b] == board[c]:
                 return board[a]
         return 'D' if '' not in board else None
