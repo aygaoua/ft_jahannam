@@ -1,15 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import styles from './Matchmaking.module.scss';
+import styles from '../styles/Matchmaking.module.scss';
 import { useNavigate } from 'react-router-dom';
 
 const Matchmaking = ({ username }) => {
   const navigate = useNavigate();
   const [isMatchFound, setIsMatchFound] = useState(false);
+  const [error, setError] = useState('');
   const socket = useRef(null);
+  
+  // Use the passed username prop or fall back to sessionStorage if necessary
+  const actualUsername = username || sessionStorage.getItem('username');
 
   useEffect(() => {
+    if (!actualUsername) {
+      setError('Username not found. Please log in again.');
+      return;
+    }
+
     if (!socket.current) {
-      socket.current = new WebSocket(`ws://localhost:8000/ws/matchmaking/${sessionStorage.getItem('username')}/`);
+      console.log("Connecting to matchmaking with username:", actualUsername);
+      
+      socket.current = new WebSocket(`ws://localhost:8000/ws/matchmaking/${actualUsername}/`);
 
       socket.current.onopen = () => {
         console.log("Matchmaking WebSocket connected");
@@ -17,55 +28,62 @@ const Matchmaking = ({ username }) => {
 
       socket.current.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        console.log("Received data:", data);
-
-        if (data.type === 'match_found' && !isMatchFound) {
-          setIsMatchFound(true);
+        if (data.type === 'match_found') {
+          console.log("Match found! Room:", data.room);
           sessionStorage.setItem('room', data.room);
+          setIsMatchFound(true);
         }
       };
 
       socket.current.onerror = (error) => {
         console.error("WebSocket error:", error);
+        setError('Connection error. Please try again.');
       };
 
-      socket.current.onclose = (event) => {
-        console.log("WebSocket closed with code:", event.code);
+      socket.current.onclose = () => {
+        console.log("WebSocket closed");
       };
     }
 
     return () => {
-      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        console.log("Closing WebSocket connection...");
+      if (socket.current) {
+        socket.current.close();
+        socket.current = null;
       }
     };
-  }, [username, isMatchFound]);
+  }, [actualUsername]);
 
   useEffect(() => {
     if (isMatchFound) {
-      navigate(`/tictactoe?room=${sessionStorage.getItem('room')}`);
+      const room = sessionStorage.getItem('room');
+      if (room) {
+        navigate(`/tictactoe?room=${room}`);
+      } else {
+        setError('Room information is missing. Please try again.');
+      }
     }
   }, [isMatchFound, navigate]);
 
   return (
     <div className={styles.container}>
-      {isMatchFound ? (
-        <div className={styles.matchFound}>
-          <h2>Match Found!</h2>
-          <p>Redirecting to the game...</p>
+      {error ? (
+        <div className={styles.error}>
+          <h2>Error</h2>
+          <p>{error}</p>
+          <button onClick={() => navigate('/login')}>Back to Login</button>
         </div>
       ) : (
-        <div className={styles.waiting}>
-          <h2>Waiting for a match...</h2>
-          <p>Room: {sessionStorage.getItem('room')}</p>
-          <p>Username: {username}</p>
-          <p>Waiting for the other player...</p>
-          <p>Click <a href="/tictactoe">here</a> if not redirected.</p>
-          <p>Click <a href="/logout">here</a> to logout.</p>
-          <p>Click <a href="/register">here</a> to register.</p>
-          <p>Click <a href="/">here</a> to go to the home page.</p>
-          <p>Click <a href="/matchmaking">here</a> to go back to matchmaking.</p>
-        </div>
+        <>
+          <h2>{isMatchFound ? "Match Found!" : "Waiting for a match..."}</h2>
+          {!isMatchFound && (
+            <>
+              <p>Username: {actualUsername}</p>
+              <div className={styles.loadingIndicator}>
+                <div className={styles.spinner}></div>
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   );
