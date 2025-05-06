@@ -1,83 +1,225 @@
-/* Home.scss */
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
-body {
-  background-color: #000;
-  color: #ffffff;
-  font-family: 'Press Start 2P', monospace;
-  margin: 0;
-  padding: 0;
-}
-
 .home-container {
+  font-family: 'Press Start 2P', cursive;
+  background-color: #000;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  position: relative;
-  background: #000;
-  overflow: hidden;
-}
-
-.scanlines {
-  pointer-events: none;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(0, 255, 0, 0.05),
-    rgba(0, 255, 0, 0.05) 2px,
-    transparent 2px,
-    transparent 4px
-  );
-  z-index: 2;
-}
-
-.home-content {
-  text-align: center;
-  z-index: 3;
-}
-
-.game-title {
-  font-size: 2rem;
-  color: #ffffff;
-  text-shadow: 0 0 5px #fff, 0 0 10px #fff;
-  margin-bottom: 0.5rem;
-}
-
-.game-subtitle {
-  font-size: 1rem;
+  padding: 2rem;
   color: #fff;
-  margin-bottom: 2rem;
-  text-shadow: 0 0 5px #fff;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      rgba(0, 0, 0, 0.1) 50%, 
+      rgba(255, 255, 255, 0.05) 50%
+    );
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 1;
+  }
 }
 
-.welcome-message {
-  font-size: 0.8rem;
-  margin-bottom: 1.5rem;
+.glitch-container {
+  margin-bottom: 3rem;
+}
+
+.glitch {
+  color: white;
+  font-size: 4rem;
+  position: relative;
+  text-shadow: 0.05em 0 0 rgba(255,0,0,.75),
+              -0.025em -0.05em 0 rgba(0,255,0,.75),
+              0.025em 0.05em 0 rgba(0,0,255,.75);
+  animation: glitch 500ms infinite;
+  
+  &::before,
+  &::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  
+  &::before {
+    animation: glitch 650ms infinite;
+    clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+    transform: translate(-0.025em, -0.0125em);
+    opacity: 0.8;
+  }
+  
+  &::after {
+    animation: glitch 375ms infinite;
+    clip-path: polygon(0 80%, 100% 20%, 100% 100%, 0 100%);
+    transform: translate(0.0125em, 0.025em);
+    opacity: 0.8;
+  }
+}
+
+@keyframes glitch {
+  0% {
+    text-shadow: 0.05em 0 0 rgba(255,0,0,.75),
+                -0.025em -0.05em 0 rgba(0,255,0,.75),
+                0.025em 0.05em 0 rgba(0,0,255,.75);
+  }
+  14% {
+    text-shadow: 0.05em 0 0 rgba(255,0,0,.75),
+                -0.025em -0.05em 0 rgba(0,255,0,.75),
+                0.025em 0.05em 0 rgba(0,0,255,.75);
+  }
+  15% {
+    text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75),
+                0.025em 0.025em 0 rgba(0,255,0,.75),
+                -0.05em -0.05em 0 rgba(0,0,255,.75);
+  }
+  49% {
+    text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75),
+                0.025em 0.025em 0 rgba(0,255,0,.75),
+                -0.05em -0.05em 0 rgba(0,0,255,.75);
+  }
+  50% {
+    text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75),
+                0.05em 0 0 rgba(0,255,0,.75),
+                0 -0.05em 0 rgba(0,0,255,.75);
+  }
+  99% {
+    text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75),
+                0.05em 0 0 rgba(0,255,0,.75),
+                0 -0.05em 0 rgba(0,0,255,.75);
+  }
+  100% {
+    text-shadow: -0.025em 0 0 rgba(255,0,0,.75),
+                -0.025em -0.025em 0 rgba(0,255,0,.75),
+                -0.025em -0.05em 0 rgba(0,0,255,.75);
+  }
+}
+
+.game-description {
+  text-align: center;
+  margin-bottom: 2rem;
+  
+  h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: #0f0;
+    text-shadow: 0 0 5px #0f0;
+  }
+  
+  p {
+    font-size: 0.8rem;
+    color: #ddd;
+  }
+}
+
+.welcome-back, .auth-options {
+  margin-bottom: 2rem;
+  text-align: center;
+  
+  .username {
+    color: #0f0;
+    text-shadow: 0 0 5px #0f0;
+  }
 }
 
 .button-container {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
+  max-width: 300px;
 }
 
-.retro-button {
-  background-color: transparent;
-  border: 2px solid #ffffff;
-  color: #ffffff;
-  padding: 0.6rem 1.2rem;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 0.6rem;
+.neon-button {
+  display: inline-block;
+  padding: 1rem;
+  font-family: inherit;
+  font-size: 1rem;
+  text-decoration: none;
+  text-align: center;
+  text-transform: uppercase;
+  color: #fff;
+  background: #000;
+  border: 0.125em solid #fff;
+  box-shadow: 0 0 0.2em #fff, 0 0 0.5em #fff;
+  transition: all 0.3s;
   cursor: pointer;
-  text-shadow: 0 0 5px #fff;
-  transition: background 0.2s, color 0.2s;
+  
+  &:hover {
+    color: #000;
+    background: #fff;
+    box-shadow: 0 0 1em #fff;
+  }
+  
+  &.play-button {
+    color: #0f0;
+    border-color: #0f0;
+    box-shadow: 0 0 0.2em #0f0, 0 0 0.5em #0f0;
+    
+    &:hover {
+      color: #000;
+      background: #0f0;
+      box-shadow: 0 0 1em #0f0;
+    }
+  }
+  
+  &.login-button {
+    color: #ff0;
+    border-color: #ff0;
+    box-shadow: 0 0 0.2em #ff0, 0 0 0.5em #ff0;
+    
+    &:hover {
+      color: #000;
+      background: #ff0;
+      box-shadow: 0 0 1em #ff0;
+    }
+  }
+  
+  &.register-button {
+    color: #0ff;
+    border-color: #0ff;
+    box-shadow: 0 0 0.2em #0ff, 0 0 0.5em #0ff;
+    
+    &:hover {
+      color: #000;
+      background: #0ff;
+      box-shadow: 0 0 1em #0ff;
+    }
+  }
+  
+  &.logout-button {
+    color: #f00;
+    border-color: #f00;
+    box-shadow: 0 0 0.2em #f00, 0 0 0.5em #f00;
+    
+    &:hover {
+      color: #000;
+      background: #f00;
+      box-shadow: 0 0 1em #f00;
+    }
+  }
 }
 
-.retro-button:hover {
-  background-color: #ffffff;
-  color: #000;
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .glitch {
+    font-size: 2.5rem;
+  }
+  
+  .game-description {
+    h2 {
+      font-size: 1.2rem;
+    }
+  }
 }

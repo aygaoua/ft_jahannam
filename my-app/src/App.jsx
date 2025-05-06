@@ -8,10 +8,15 @@ import Home from './pages/Home';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/ProtectedRoute';
 
+// Utility function for clearing session storage
+function clearSessionAndNavigate(path) {
+  sessionStorage.clear();
+  return <Navigate to={path} />;
+}
+
 // Component to handle logout
 function Logout() {
-  sessionStorage.clear();
-  return <Navigate to="/login" />;
+  return clearSessionAndNavigate('/login');
 }
 
 // Component to handle register (with logout)

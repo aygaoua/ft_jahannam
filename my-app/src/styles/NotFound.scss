@@ -1,0 +1,221 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+.not-found-container {
+  font-family: 'Press Start 2P', cursive;
+  background-color: #000;
+  color: #fff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      rgba(0, 0, 0, 0.1) 50%, 
+      rgba(255, 255, 255, 0.05) 50%
+    );
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+.glitch-text {
+  font-size: 8rem;
+  color: #f00;
+  text-shadow: 0 0 10px #f00;
+  position: relative;
+  margin-bottom: 2rem;
+  
+  &::before,
+  &::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    width: 100%;
+    height: 100%;
+  }
+  
+  &::before {
+    left: -2px;
+    text-shadow: 2px 0 #0f0;
+    animation: glitch-anim-1 2s infinite linear alternate-reverse;
+  }
+  
+  &::after {
+    left: 2px;
+    text-shadow: -2px 0 #00f;
+    animation: glitch-anim-2 3s infinite linear alternate-reverse;
+  }
+}
+
+@keyframes glitch-anim-1 {
+  0% {
+    clip-path: inset(80% 0 0 0);
+  }
+  20% {
+    clip-path: inset(20% 0 40% 0);
+  }
+  40% {
+    clip-path: inset(60% 0 20% 0);
+  }
+  60% {
+    clip-path: inset(10% 0 70% 0);
+  }
+  80% {
+    clip-path: inset(30% 0 30% 0);
+  }
+  100% {
+    clip-path: inset(0 0 90% 0);
+  }
+}
+
+@keyframes glitch-anim-2 {
+  0% {
+    clip-path: inset(10% 0 70% 0);
+  }
+  20% {
+    clip-path: inset(60% 0 20% 0);
+  }
+  40% {
+    clip-path: inset(20% 0 40% 0);
+  }
+  60% {
+    clip-path: inset(80% 0 0 0);
+  }
+  80% {
+    clip-path: inset(0 0 90% 0);
+  }
+  100% {
+    clip-path: inset(30% 0 30% 0);
+  }
+}
+
+.error-title {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #f00;
+  letter-spacing: 3px;
+}
+
+.error-message {
+  font-size: 1rem;
+  margin-bottom: 3rem;
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+.continue-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+  
+  .blink {
+    font-size: 1.5rem;
+    animation: blink 1s step-end infinite;
+    margin-bottom: 1rem;
+  }
+  
+  .countdown {
+    font-size: 2rem;
+    color: #ff0;
+    animation: countdown 10s linear forwards;
+  }
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes countdown {
+  0% {
+    content: "10";
+  }
+  10% {
+    content: "9";
+  }
+  20% {
+    content: "8";
+  }
+  30% {
+    content: "7";
+  }
+  40% {
+    content: "6";
+  }
+  50% {
+    content: "5";
+  }
+  60% {
+    content: "4";
+  }
+  70% {
+    content: "3";
+  }
+  80% {
+    content: "2";
+  }
+  90% {
+    content: "1";
+  }
+  100% {
+    content: "0";
+  }
+}
+
+.restart-button {
+  display: inline-block;
+  padding: 1rem 2rem;
+  font-family: inherit;
+  font-size: 1rem;
+  color: #0f0;
+  background-color: transparent;
+  border: 2px solid #0f0;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  box-shadow: 0 0 10px #0f0;
+  transition: all 0.3s;
+  
+  &:hover {
+    background-color: #0f0;
+    color: #000;
+    box-shadow: 0 0 20px #0f0;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .glitch-text {
+    font-size: 5rem;
+  }
+  
+  .error-title {
+    font-size: 1.5rem;
+  }
+  
+  .error-message {
+    font-size: 0.8rem;
+  }
+  
+  .continue-prompt .blink {
+    font-size: 1.2rem;
+  }
+}

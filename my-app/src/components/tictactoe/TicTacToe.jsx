@@ -21,6 +21,8 @@ const TicTacToe = () => {
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [errorMessage, setErrorMessage] = useState('');
+  const [opponentLeft, setOpponentLeft] = useState(false);
+  const [waitingForOpponent, setWaitingForOpponent] = useState(false);
   
   // Refs
   const socket = useRef(null);
@@ -31,125 +33,186 @@ const TicTacToe = () => {
   const MAX_RECONNECT_ATTEMPTS = 5;
   const RECONNECT_DELAY = 2000; // 2 seconds
 
-  // Connect to WebSocket server
-  const connectWebSocket = useCallback(() => {
-    if (connectionAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      setConnectionStatus('failed');
-      setErrorMessage(`Failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts. Please check if the server is running.`);
-      return;
+  // Store room in session storage if it exists
+  useEffect(() => {
+    if (room) {
+      sessionStorage.setItem('room', room);
+    }
+  }, [room]);
+
+  // Improved WebSocket reconnection logic and error handling
+  useEffect(() => {
+    if (!username || !room) {
+        setErrorMessage("Missing username or room information");
+        return;
     }
 
-    // Close existing socket if open
+    connectWebSocket();
+
+    return () => {
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+        }
+
+        if (socket.current) {
+            socket.current.close();
+            socket.current = null;
+        }
+    };
+  }, [username, room, connectionAttempts]);
+
+  const connectWebSocket = useCallback(() => {
+    if (connectionAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        setConnectionStatus('failed');
+        setErrorMessage(`Failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts. Please check if the server is running.`);
+        return;
+    }
+
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-      socket.current.close();
+        socket.current.close();
     }
 
     setConnectionStatus('connecting');
     console.log(`Connecting to TicTacToe room: ${room} (Attempt ${connectionAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
-    
+
     try {
-      socket.current = new WebSocket(`ws://localhost:8000/ws/tictactoe/${room}/`);
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+        const wsUrl = `${wsProtocol}//${wsHost}/ws/tictactoe/${room}/`;
 
-      // Connection opened
-      socket.current.onopen = () => {
-        console.log("TicTacToe WebSocket connected successfully");
-        setIsSocketOpen(true);
-        setConnectionStatus('connected');
-        setErrorMessage('');
-        setConnectionAttempts(0); // Reset attempts counter on successful connection
-      };
+        socket.current = new WebSocket(wsUrl);
 
-      // Listen for messages
-      socket.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("Received game message:", data);
+        socket.current.onopen = () => {
+            console.log("TicTacToe WebSocket connected successfully");
+            setIsSocketOpen(true);
+            setConnectionStatus('connected');
+            setErrorMessage('');
+            setConnectionAttempts(0);
+            if (socket.current && username) {
+                socket.current.send(JSON.stringify({ type: 'join', username: username }));
+                console.log("Sent join message with username:", username);
+            }
+        };
 
-          switch (data.type) {
-            case 'start':
-              setPlayer(data.symbol);
-              setOpponent(data.opponent);
-              setCurrentTurn('X'); // Game always starts with X
-              break;
-              
-            case 'move':
-              setBoard(data.board);
-              setCurrentTurn(data.currentTurn);
-              if (data.winner) {
-                setWinner(data.winner);
-                const highlightedCells = getWinningCombination(data.board);
-                setWinningCells(highlightedCells);
-              }
-              break;
-              
-            case 'reset':
-              resetGameState();
-              break;
-              
-            case 'opponent_left':
-              // Handle opponent disconnection
-              setErrorMessage('Your opponent has left the game.');
-              break;
-              
-            default:
-              console.log("Unknown message type:", data.type);
-          }
-        } catch (error) {
-          console.error("Error processing WebSocket message:", error);
-        }
-      };
+        socket.current.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            console.log("Received game message:", data);
+            handleWebSocketMessage(data);
+        };
 
-      // Handle errors
-      socket.current.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        setConnectionStatus('error');
-      };
+        socket.current.onerror = (error) => {
+            console.error("WebSocket error:", error);
+            setConnectionStatus('error');
+            setErrorMessage('A WebSocket error occurred. Please try reconnecting.');
+        };
 
-      // Connection closed
-      socket.current.onclose = (event) => {
-        console.log(`WebSocket closed with code: ${event.code}, reason: ${event.reason || 'No reason provided'}`);
-        setIsSocketOpen(false);
-        setConnectionStatus('disconnected');
+        socket.current.onclose = (event) => {
+            console.log(`WebSocket closed with code: ${event.code}, reason: ${event.reason || 'No reason provided'}`);
+            setIsSocketOpen(false);
+            setConnectionStatus('disconnected');
 
-        // Attempt to reconnect if we haven't reached the limit
-        if (connectionAttempts < MAX_RECONNECT_ATTEMPTS) {
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-          }
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
-            setConnectionAttempts(prev => prev + 1);
-          }, RECONNECT_DELAY);
-        }
-      };
+            if (connectionAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectTimeoutRef.current = setTimeout(() => {
+                    setConnectionAttempts(prev => prev + 1);
+                }, RECONNECT_DELAY);
+            } else {
+                setErrorMessage('Maximum reconnection attempts reached. Please check your connection.');
+            }
+        };
     } catch (error) {
-      console.error("Error creating WebSocket:", error);
-      setConnectionStatus('error');
-      setErrorMessage(`Failed to create WebSocket connection: ${error.message}`);
+        console.error("Error creating WebSocket:", error);
+        setConnectionStatus('error');
+        setErrorMessage(`Failed to create WebSocket connection: ${error.message}`);
+        reconnectTimeoutRef.current = setTimeout(() => {
+            setConnectionAttempts(prev => prev + 1);
+        }, RECONNECT_DELAY);
     }
-  }, [room, connectionAttempts]);
+  }, [room, connectionAttempts, username]);
 
-  // Initialize connection and handle reconnection
-  useEffect(() => {
-    if (!username || !room) {
-      setErrorMessage("Missing username or room information");
-      return;
+  // Handle WebSocket messages
+  const handleWebSocketMessage = (data) => {
+    switch (data.type) {
+      case 'start':
+        console.log("Game starting with data:", data);
+        setPlayer(data.symbol);
+        setOpponent(data.opponent || (data.symbol === 'X' ? 'Player 2' : 'Player 1'));
+        setBoard(Array(9).fill(''));
+        setWinner(null);
+        setWinningCells([]);
+        setCurrentTurn('X');
+        setOpponentLeft(false);
+        setWaitingForOpponent(false);
+        setErrorMessage('');
+        break;
+        
+      case 'move':
+        console.log("Move received:", data);
+        if (data.board) {
+          setBoard(data.board);
+        }
+        if (data.currentTurn) {
+          setCurrentTurn(data.currentTurn);
+        }
+        if (data.winner) {
+          setWinner(data.winner);
+          if (data.winner !== 'D') {
+            const highlightedCells = getWinningCombination(data.board);
+            setWinningCells(highlightedCells);
+          }
+        }
+        break;
+        
+      case 'reset':
+        resetGameState();
+        break;
+        
+      case 'opponent_left':
+        console.log("Opponent left the game");
+        setOpponentLeft(true);
+        setWaitingForOpponent(true);
+        setErrorMessage('Your opponent has left the game. Waiting for them to reconnect...');
+
+        const timeoutId = setTimeout(() => {
+            if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+                setWaitingForOpponent(false);
+                setErrorMessage('Your opponent didn\'t reconnect. You can leave or wait longer.');
+            }
+        }, 30000);
+
+        reconnectTimeoutRef.current = timeoutId; // Store timeout ID for cleanup
+        break;
+
+      case 'opponent_rejoined':
+        console.log("Opponent rejoined the game");
+        setOpponentLeft(false);
+        setWaitingForOpponent(false);
+        setErrorMessage('');
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current); // Clear timeout on rejoin
+            reconnectTimeoutRef.current = null;
+        }
+        break;
+        
+      case 'waiting_for_opponent':
+        console.log("Waiting for opponent to join");
+        setWaitingForOpponent(true);
+        setErrorMessage('Waiting for opponent to join...');
+        break;
+        
+      case 'end':
+        setTimeout(() => {
+          resetGameState();
+        }, 2000);
+        break;
+
+      case 'error':
+        setErrorMessage(data.message || "An error occurred in the game");
+        break;
+
+      default:
+        console.log("Unknown message type:", data.type);
     }
-    
-    connectWebSocket();
-    
-    // Cleanup on unmount
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      
-      if (socket.current) {
-        socket.current.close();
-        socket.current = null;
-      }
-    };
-  }, [username, room, connectWebSocket, connectionAttempts]);
+  };
 
   // Reset game state (local reset)
   const resetGameState = () => {
@@ -165,6 +228,11 @@ const TicTacToe = () => {
     if (!isSocketOpen || winner || board[index] || currentTurn !== player) {
       return;
     }
+    
+    // Update local state optimistically
+    const newBoard = [...board];
+    newBoard[index] = player;
+    setBoard(newBoard);
     
     // Send move to server
     if (socket.current && socket.current.readyState === WebSocket.OPEN) {
@@ -202,7 +270,11 @@ const TicTacToe = () => {
 
   // Game status message
   const getStatusMessage = () => {
-    if (winner === 'D') {
+    if (waitingForOpponent) {
+      return opponentLeft 
+        ? "Opponent left - waiting for reconnection..." 
+        : "Waiting for opponent to join...";
+    } else if (winner === 'D') {
       return "It's a draw!";
     } else if (winner) {
       return winner === player ? "You win!" : "Opponent wins!";
@@ -214,13 +286,14 @@ const TicTacToe = () => {
   // Cell component
   const Cell = ({ index }) => {
     const isHighlighted = winningCells.includes(index);
+    const cellValue = board[index];
     
     return (
       <div
-        className={`${styles.cell} ${isHighlighted ? styles.winningCell : ''}`}
+        className={`${styles.cell} ${isHighlighted ? styles.winningCell : ''} ${cellValue ? styles.filled : ''}`}
         onClick={() => handleMove(index)}
       >
-        {board[index] && <span>{board[index]}</span>}
+        {cellValue && <span>{cellValue}</span>}
       </div>
     );
   };
@@ -237,11 +310,30 @@ const TicTacToe = () => {
     navigate('/matchmaking');
   };
 
+  // Handle heartbeat pings to keep connection alive
+  useEffect(() => {
+    if (!isSocketOpen || !socket.current) return;
+    
+    const pingInterval = setInterval(() => {
+      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+        socket.current.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000); // Send ping every 30 seconds
+    
+    return () => clearInterval(pingInterval);
+  }, [isSocketOpen]);
+
+  // Reconnect button handler specific for opponent left scenario
+  const waitForOpponent = () => {
+    setErrorMessage('Waiting for opponent to reconnect...');
+    setWaitingForOpponent(true);
+  };
+
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>TIC-TAC-TOE</h1>
       
-      {connectionStatus === 'failed' || errorMessage ? (
+      {connectionStatus === 'failed' ? (
         <div className={styles.error}>
           <p>{errorMessage || "Connection error"}</p>
           <div className={styles.buttonGroup}>
@@ -274,6 +366,24 @@ const TicTacToe = () => {
             {getStatusMessage()}
           </div>
           
+          {errorMessage && opponentLeft && (
+            <div className={styles.opponentLeftMessage}>
+              <p>{errorMessage}</p>
+              <div className={styles.buttonGroup}>
+                <button 
+                  onClick={waitForOpponent} 
+                  className={styles.button}
+                  disabled={waitingForOpponent}
+                >
+                  {waitingForOpponent ? "Waiting..." : "Wait for Opponent"}
+                </button>
+                <button onClick={goBack} className={styles.button}>
+                  Leave Game
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div className={styles.board}>
             {board.map((_, i) => <Cell key={i} index={i} />)}
           </div>
@@ -282,7 +392,7 @@ const TicTacToe = () => {
             <button 
               className={styles.resetButton} 
               onClick={requestReset}
-              disabled={!isSocketOpen}
+              disabled={!isSocketOpen || !winner}
             >
               PLAY AGAIN
             </button>
