@@ -1,255 +1,323 @@
-from channels.generic.websocket import AsyncWebsocketConsumer
-import json
 import asyncio
 import logging
 import uuid
+from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
+from asgiref.sync import sync_to_async
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+import json
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 # Use asyncio.Queue for thread-safe matchmaking
-waiting_players = asyncio.Queue()
+# waiting_players = asyncio.Queue()
+
+# In-memory queue for waiting players
+# In production, you might want to use Redis or another distributed solution
+WAITING_PLAYERS = []
 
 class MatchmakingConsumer(AsyncWebsocketConsumer):
-    async def remove_player_from_queue(self, username):
-        removed = False
-        temp_list = []
-        try:
-            while True:
-                player = waiting_players.get_nowait()
-                if player == username:
-                    removed = True
-                else:
-                    temp_list.append(player)
-        except asyncio.QueueEmpty:
-            pass
-        for player in temp_list:
-            waiting_players.put_nowait(player)
-        return removed
-
     async def connect(self):
         self.username = self.scope['url_route']['kwargs']['username']
-        logger.info(f"Matchmaking: {self.username} connected")
-
+        self.user = await self.get_user(self.username)
+        
+        if not self.user:
+            await self.close()
+            return
+        
+        # Accept the connection
         await self.accept()
-        logger.info(f"Matchmaking: {self.username} connection accepted")
-
-        try:
-            if not waiting_players.empty():
-                opponent = await waiting_players.get()
-                room = f"room_{uuid.uuid4()}"
-
-                logger.info(f"Matchmaking: Match found! {self.username} vs {opponent} in room {room}")
-
-                # Send room info to both players
-                await self.channel_layer.group_send(
-                    f"match_{opponent}",
-                    {"type": "match.found", "room": room}
-                )
-                removed = await self.remove_player_from_queue(self.username)
-                if removed:
-                    logger.info(f"Matchmaking: {self.username} removed from waiting list")
-            else:
-                await waiting_players.put(self.username)
-                logger.info(f"Matchmaking: {self.username} added to waiting list")
-                await self.channel_layer.group_add(f"match_{self.username}", self.channel_name)
-        except Exception as e:
-            logger.error(f"Matchmaking: Error during matchmaking: {str(e)}")
-
+        
+        # Add user to waiting players
+        player_info = {
+            'username': self.username,
+            'channel_name': self.channel_name
+        }
+        
+        # Check if there are any waiting players
+        if WAITING_PLAYERS:
+            # Match found - get the first waiting player
+            opponent = WAITING_PLAYERS.pop(0)
+            
+            # Create a unique room ID
+            room_id = str(uuid.uuid4())[:8]
+            
+            # Notify both players
+            await self.channel_layer.send(
+                opponent['channel_name'],
+                {
+                    'type': 'match_found',
+                    'room': room_id,
+                    'opponent': self.username
+                }
+            )
+            
+            await self.match_found({
+                'room': room_id,
+                'opponent': opponent['username']
+            })
+        else:
+            # No waiting players, add self to queue
+            WAITING_PLAYERS.append(player_info)
+            
+            # Send waiting confirmation
+            await self.send(json.dumps({
+                'type': 'waiting',
+                'message': 'Waiting for an opponent'
+            }))
+    
     async def disconnect(self, close_code):
-        logger.info(f"Matchmaking: {self.username} disconnected with code {close_code}")
-
-        try:
-            temp_list = []
-            try:
-                while True:
-                    player = waiting_players.get_nowait()
-                    if player != self.username:
-                        temp_list.append(player)
-            except asyncio.QueueEmpty:
-                pass
-
-            for player in temp_list:
-                waiting_players.put_nowait(player)
-
-            logger.info(f"Matchmaking: {self.username} removed from waiting list")
-
-            await self.channel_layer.group_discard(f"match_{self.username}", self.channel_name)
-        except Exception as e:
-            logger.error(f"Matchmaking: Error during disconnect: {str(e)}")
-
+        # Remove from waiting queue if disconnected
+        for i, player in enumerate(WAITING_PLAYERS):
+            if player['username'] == self.username:
+                WAITING_PLAYERS.pop(i)
+                break
+    
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        message_type = data.get('type')
+        
+        if message_type == 'cancel_matchmaking':
+            # Remove from waiting queue
+            for i, player in enumerate(WAITING_PLAYERS):
+                if player['username'] == self.username:
+                    WAITING_PLAYERS.pop(i)
+                    await self.send(json.dumps({
+                        'type': 'matchmaking_cancelled',
+                        'message': 'Matchmaking cancelled'
+                    }))
+                    break
+    
     async def match_found(self, event):
-        logger.info(f"Matchmaking: Sending match found to {self.username}, room: {event['room']}")
-        await self.send(text_data=json.dumps({
-            "type": "match_found",
-            "room": event["room"]
+        # Send match found message to the client
+        await self.send(json.dumps({
+            'type': 'match_found',
+            'room': event['room'],
+            'opponent': event['opponent']
         }))
+    
+    @database_sync_to_async
+    def get_user(self, username):
+        User = get_user_model()
+        try:
+            return User.objects.get(username=username)
+        except User.DoesNotExist:
+            return None
+
+
+GAME_ROOMS = {}
 
 class TicTacToeConsumer(AsyncWebsocketConsumer):
-    # Class variables for shared state
-    rooms = {}
-    game_states = {}
-    player_symbols = {}
-
     async def connect(self):
-        self.room_name = self.scope['url_route']['kwargs']['room_name']
-        self.room_group_name = f"tictactoe_{self.room_name}"
-
-        logger.info(f"TicTacToe: Connecting to room {self.room_name}")
-
-        try:
-            await self.channel_layer.group_add(self.room_group_name, self.channel_name)
-            await self.accept()
-            logger.info(f"TicTacToe: Connection accepted for room {self.room_name}")
-
-            players = self.rooms.setdefault(self.room_name, [])
-            if len(players) < 2:
-                players.append(self.channel_name)
-                logger.info(f"TicTacToe: Player added to room {self.room_name} ({len(players)}/2)")
-
-            if len(players) == 2:
-                logger.info(f"TicTacToe: Game starting in room {self.room_name}")
-                self.game_states[self.room_name] = {
-                    'board': [''] * 9,
-                    'currentTurn': 'X',
-                    'winner': None
+        self.room_id = self.scope['url_route']['kwargs']['room_id']
+        self.username = self.scope['url_route']['kwargs'].get('username')
+        self.room_group_name = f'game_{self.room_id}'
+        
+        # Join room group
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+        
+        await self.accept()
+        
+        # Initialize game if it doesn't exist
+        if self.room_id not in GAME_ROOMS:
+            GAME_ROOMS[self.room_id] = {
+                'board': [None] * 9,
+                'players': [],
+                'current_turn': None,
+                'game_over': False,
+                'winner': None
+            }
+        
+        # Add player to the game
+        game = GAME_ROOMS[self.room_id]
+        if self.username and self.username not in [player['username'] for player in game['players']]:
+            # Assign X to first player, O to second
+            symbol = 'X' if len(game['players']) == 0 else 'O'
+            game['players'].append({
+                'username': self.username,
+                'symbol': symbol,
+                'channel_name': self.channel_name
+            })
+            
+            # Set current turn if this is the first player
+            if len(game['players']) == 1:
+                game['current_turn'] = self.username
+        
+        # Send current game state
+        await self.send(json.dumps({
+            'type': 'game_state',
+            'board': game['board'],
+            'players': [{'username': p['username'], 'symbol': p['symbol']} for p in game['players']],
+            'current_turn': game['current_turn'],
+            'game_over': game['game_over'],
+            'winner': game['winner']
+        }))
+        
+        # Notify all clients if both players are connected
+        if len(game['players']) == 2:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'game_ready',
+                    'players': [{'username': p['username'], 'symbol': p['symbol']} for p in game['players']]
                 }
-
-                for i, channel in enumerate(players):
-                    symbol = 'X' if i == 0 else 'O'
-                    self.player_symbols[channel] = symbol
-                    opponent = players[1] if i == 0 else players[0]
-
-                    logger.info(f"TicTacToe: Sending start to player {i+1} with symbol {symbol}")
-                    await self.channel_layer.send(channel, {
-                        'type': 'send_start',
-                        'symbol': symbol,
-                        'opponent': 'Player 2' if i == 0 else 'Player 1'
-                    })
-        except Exception as e:
-            logger.error(f"TicTacToe: Error in connect: {str(e)}")
-            if hasattr(self, 'room_group_name'):
-                await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
-            if hasattr(self, 'close'):
-                await self.close(code=1011)
-
+            )
+    
     async def disconnect(self, close_code):
-        logger.info(f"TicTacToe: Disconnecting from room {self.room_name} with code {close_code}")
-
-        try:
-            await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
-
-            if self.room_name in self.rooms and self.channel_name in self.rooms.get(self.room_name, []):
-                self.rooms[self.room_name].remove(self.channel_name)
-                logger.info(f"TicTacToe: Player removed from room {self.room_name}")
-
-                if not self.rooms[self.room_name]:
-                    logger.info(f"TicTacToe: Room {self.room_name} is now empty. Cleaning up state.")
-                    self.rooms.pop(self.room_name, None)
-                    self.game_states.pop(self.room_name, None)
-                else:
-                    remaining_player = self.rooms[self.room_name][0]
-                    await self.channel_layer.send(remaining_player, {
-                        'type': 'send_opponent_left'
-                    })
-
-            if self.channel_name in self.player_symbols:
-                self.player_symbols.pop(self.channel_name)
-        except Exception as e:
-            logger.error(f"TicTacToe: Error in disconnect: {str(e)}")
-
+        # Remove player from game
+        if self.room_id in GAME_ROOMS:
+            game = GAME_ROOMS[self.room_id]
+            game['players'] = [p for p in game['players'] if p['username'] != self.username]
+            
+            # Notify remaining player that opponent left
+            if game['players']:
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'player_left',
+                        'username': self.username
+                    }
+                )
+            else:
+                # Clean up if no players left
+                del GAME_ROOMS[self.room_id]
+        
+        # Leave room group
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+    
     async def receive(self, text_data):
-        try:
-            data = json.loads(text_data)
-            logger.info(f"TicTacToe: Received message in room {self.room_name}: {data['type']}")
-
-            state = self.game_states.get(self.room_name)
-            if not state:
-                logger.warning(f"TicTacToe: No game state found for room {self.room_name}")
-                return
-
-            if data['type'] == 'move':
-                index = data['index']
-                player_symbol = self.player_symbols.get(self.channel_name)
-
-                if (
-                    state and
-                    0 <= index < 9 and
-                    state['board'][index] == '' and
-                    state['winner'] is None and
-                    player_symbol == state['currentTurn']
-                ):
-                    state['board'][index] = player_symbol
-                    state['winner'] = self.check_winner(state['board'])
-                    state['currentTurn'] = 'O' if player_symbol == 'X' else 'X'
-
-                    logger.info(f"TicTacToe: Move made in room {self.room_name}, index {index}, winner: {state['winner']}")
-
-                    await self.channel_layer.group_send(self.room_group_name, {
-                        'type': 'send_move',
-                        'board': state['board'],
-                        'winner': state['winner'],
-                        'currentTurn': state['currentTurn']
-                    })
-
-            elif data['type'] == 'reset':
-                self.game_states[self.room_name] = {
-                    'board': [''] * 9,
-                    'currentTurn': 'X',
-                    'winner': None
-                }
-                logger.info(f"TicTacToe: Game reset in room {self.room_name}")
-
-                await self.channel_layer.group_send(self.room_group_name, {
-                    'type': 'send_reset'
-                })
-        except Exception as e:
-            logger.error(f"TicTacToe: Error processing message: {str(e)}")
-
-    async def send_start(self, event):
-        try:
-            logger.info(f"TicTacToe: Sending start event to player")
-            await self.send(text_data=json.dumps({
-                'type': 'start',
-                'symbol': event['symbol'],
-                'opponent': event['opponent']
-            }))
-        except Exception as e:
-            logger.error(f"TicTacToe: Error sending start event: {str(e)}")
-
-    async def send_move(self, event):
-        try:
-            await self.send(text_data=json.dumps({
-                'type': 'move',
-                'board': event['board'],
-                'winner': event['winner'],
-                'currentTurn': event['currentTurn']
-            }))
-        except Exception as e:
-            logger.error(f"TicTacToe: Error sending move event: {str(e)}")
-
-    async def send_reset(self, _):
-        try:
-            await self.send(text_data=json.dumps({ 'type': 'reset' }))
-        except Exception as e:
-            logger.error(f"TicTacToe: Error sending reset event: {str(e)}")
-
-    async def send_opponent_left(self, _):
-        try:
-            await self.send(text_data=json.dumps({
-                'type': 'opponent_left',
-                'message': 'Your opponent has left the game'
-            }))
-        except Exception as e:
-            logger.error(f"TicTacToe: Error sending opponent_left event: {str(e)}")
-
-    def check_winner(self, board):
-        combos = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8],
-            [0, 3, 6], [1, 4, 7], [2, 5, 8],
-            [0, 4, 8], [2, 4, 6]
+        data = json.loads(text_data)
+        message_type = data.get('type')
+        
+        if message_type == 'make_move':
+            await self.make_move(data)
+        elif message_type == 'restart_game':
+            await self.restart_game()
+    
+    async def make_move(self, data):
+        game = GAME_ROOMS.get(self.room_id)
+        if not game:
+            return
+        
+        # Check if it's the player's turn and game is not over
+        if game['current_turn'] != self.username or game['game_over']:
+            return
+        
+        position = data.get('position')
+        if position is None or not (0 <= position < 9) or game['board'][position] is not None:
+            return
+        
+        # Find player's symbol
+        player = next((p for p in game['players'] if p['username'] == self.username), None)
+        if not player:
+            return
+        
+        # Make the move
+        game['board'][position] = player['symbol']
+        
+        # Check for win or draw
+        winner, game_over = self.check_game_state(game['board'])
+        game['winner'] = winner
+        game['game_over'] = game_over
+        
+        # Switch turns if game is not over
+        if not game_over:
+            other_player = next((p for p in game['players'] if p['username'] != self.username), None)
+            if other_player:
+                game['current_turn'] = other_player['username']
+        
+        # Broadcast updated game state
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'update_game_state',
+                'board': game['board'],
+                'current_turn': game['current_turn'],
+                'game_over': game['game_over'],
+                'winner': game['winner']
+            }
+        )
+    
+    def check_game_state(self, board):
+        # Check rows, columns, and diagonals for win
+        win_positions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],  # rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],  # columns
+            [0, 4, 8], [2, 4, 6]              # diagonals
         ]
-        for a, b, c in combos:
-            if board[a] and board[a] == board[b] == board[c]:
-                return board[a]
-        return 'D' if '' not in board else None
+        
+        for positions in win_positions:
+            if board[positions[0]] is not None and board[positions[0]] == board[positions[1]] == board[positions[2]]:
+                # Find winner's username
+                for player in GAME_ROOMS[self.room_id]['players']:
+                    if player['symbol'] == board[positions[0]]:
+                        return player['username'], True
+        
+        # Check for draw (all positions filled)
+        if all(cell is not None for cell in board):
+            return None, True
+        
+        return None, False
+    
+    async def restart_game(self):
+        game = GAME_ROOMS.get(self.room_id)
+        if not game:
+            return
+        
+        # Reset the game state
+        game['board'] = [None] * 9
+        game['game_over'] = False
+        game['winner'] = None
+        
+        # Switch starting player
+        if len(game['players']) == 2:
+            prev_starter = game['players'][0]['username'] if game['players'][0]['symbol'] == 'X' else game['players'][1]['username']
+            new_starter = next(p['username'] for p in game['players'] if p['username'] != prev_starter)
+            
+            # Swap symbols
+            for player in game['players']:
+                player['symbol'] = 'O' if player['symbol'] == 'X' else 'X'
+            
+            game['current_turn'] = new_starter
+        
+        # Broadcast restarted game state
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'update_game_state',
+                'board': game['board'],
+                'players': [{'username': p['username'], 'symbol': p['symbol']} for p in game['players']],
+                'current_turn': game['current_turn'],
+                'game_over': game['game_over'],
+                'winner': game['winner']
+            }
+        )
+    
+    async def game_ready(self, event):
+        await self.send(json.dumps({
+            'type': 'game_ready',
+            'players': event['players']
+        }))
+    
+    async def update_game_state(self, event):
+        await self.send(json.dumps({
+            'type': 'game_state',
+            'board': event['board'],
+            'current_turn': event['current_turn'],
+            'game_over': event['game_over'],
+            'winner': event['winner']
+        }))
+    
+    async def player_left(self, event):
+        await self.send(json.dumps({
+            'type': 'player_left',
+            'username': event['username']
+        }))

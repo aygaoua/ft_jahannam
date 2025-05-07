@@ -7,3 +7,5 @@ PyJWT
 pytz
 sqlparse
 python-dotenv
+channels
+daphne
