@@ -40,20 +40,21 @@
   background-color: black;
   border: 5px solid white;
   cursor: pointer;
-  aspect-ratio: 1;
   min-height: 0;
   padding: 0;
   transition: all 0.2s ease;
-
+  
   &:hover:not(:disabled) {
     background-color: gray;
   }
-
+  
   &:disabled {
     cursor: not-allowed;
   }
-
+  
   span {
+    color: #fff;
+    font-family: 'Press Start 2P', cursive;
     position: absolute;
     top: 0;
     left: 0;
