@@ -47,11 +47,11 @@ const TicTacToe = () => {
           setCurrentTurn(data.current_turn);
           setGameOver(data.game_over);
           setWinner(data.winner);
-          
+
           if (data.players) {
             setPlayers(data.players);
           }
-          
+
           // Check for winning cells
           if (data.game_over && data.winner) {
             const winPositions = checkWinningCells(data.board);
@@ -59,7 +59,7 @@ const TicTacToe = () => {
               setWinningCells(winPositions);
             }
           }
-          
+
           if (data.game_over) {
             if (data.winner) {
               setStatusMessage(data.winner === username ? 'YOU WIN!' : `${data.winner} WINS!`);
@@ -108,14 +108,14 @@ const TicTacToe = () => {
       [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
       [0, 4, 8], [2, 4, 6]             // diagonals
     ];
-    
+
     for (const pattern of winPatterns) {
       const [a, b, c] = pattern;
       if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
         return pattern;
       }
     }
-    
+
     return [];
   };
 
@@ -154,22 +154,22 @@ const TicTacToe = () => {
             ))}
           </div>
         )}
-        <div>ROOM: {roomId}</div>
+        {/* <div>ROOM: {roomId}</div> */}
         <div>{statusMessage}</div>
       </div>
 
-      
+
       <div className={styles.board}>
-        {board.map((cell, index) => (
-          <button
-            key={index}
-            className={`${styles.cell} ${winningCells.includes(index) ? styles.winningCell : ''}`}
-            onClick={() => handleCellClick(index)}
-            disabled={currentTurn !== username || gameOver || cell !== null}
-          >
-            {<span className={styles.span}>{cell}</span>}
-          </button>
-        ))}
+          {board.map((cell, index) => (
+              <button
+                key={index}
+                className={`${styles.cell} ${winningCells.includes(index) ? styles.winningCell : ''}`}
+                onClick={() => handleCellClick(index)}
+                disabled={currentTurn !== username || gameOver || cell !== null}
+              >
+                {<span className={styles.span}>{cell}</span>}
+              </button>
+          ))}
       </div>
 
       <div>
