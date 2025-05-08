@@ -174,9 +174,9 @@ const TicTacToe = () => {
 
       <div>
         {(gameOver) && (
-        <button className={styles.resetButton} onClick={exitGame}>
-          EXIT GAME
-        </button>)}
+          <button className={styles.resetButton} onClick={exitGame}>
+            EXIT GAME
+          </button>)}
       </div>
     </div>
   );
