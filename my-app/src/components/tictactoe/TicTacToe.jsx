@@ -75,6 +75,8 @@ const TicTacToe = () => {
 
         case 'player_left':
           setStatusMessage(`${data.username.toUpperCase()} LEFT THE GAME`);
+          // setWinner(sessionStorage.getItem('username'));
+          setGameOver(true);
           break;
 
         default:
@@ -130,15 +132,8 @@ const TicTacToe = () => {
     }));
   };
 
-  const restartGame = () => {
-    setWinningCells([]);
-    socket.current.send(JSON.stringify({
-      type: 'restart_game'
-    }));
-  };
-
   const exitGame = () => {
-    navigate('/matchmaking');
+    navigate('/');
   };
 
   // Find current player's symbol
@@ -172,21 +167,16 @@ const TicTacToe = () => {
             onClick={() => handleCellClick(index)}
             disabled={currentTurn !== username || gameOver || cell !== null}
           >
-            {/* {cell && <span>{cell}</span>} */}
-            {<span className={styles.status}>{cell}</span>}
+            {<span className={styles.span}>{cell}</span>}
           </button>
         ))}
       </div>
 
       <div>
-        {gameOver && (
-          <button className={styles.resetButton} onClick={restartGame}>
-            PLAY AGAIN
-          </button>
-        )}
+        {(gameOver) && (
         <button className={styles.resetButton} onClick={exitGame}>
           EXIT GAME
-        </button>
+        </button>)}
       </div>
     </div>
   );
