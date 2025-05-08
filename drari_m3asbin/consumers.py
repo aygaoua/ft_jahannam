@@ -21,7 +21,7 @@ WAITING_PLAYERS = []
 class MatchmakingConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.username = self.scope['url_route']['kwargs']['username']
-        self.user = await self.get_user(self.username)
+        self.user = await self.get_user(self.username) # type: ignore
         
         if not self.user:
             await self.close()
@@ -199,8 +199,6 @@ class TicTacToeConsumer(AsyncWebsocketConsumer):
         
         if message_type == 'make_move':
             await self.make_move(data)
-        elif message_type == 'restart_game':
-            await self.restart_game()
     
     async def make_move(self, data):
         game = GAME_ROOMS.get(self.room_id)
@@ -247,11 +245,10 @@ class TicTacToeConsumer(AsyncWebsocketConsumer):
         )
     
     def check_game_state(self, board):
-        # Check rows, columns, and diagonals for win
         win_positions = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8],  # rows
-            [0, 3, 6], [1, 4, 7], [2, 5, 8],  # columns
-            [0, 4, 8], [2, 4, 6]              # diagonals
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
         ]
         
         for positions in win_positions:

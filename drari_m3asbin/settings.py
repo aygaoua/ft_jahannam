@@ -56,9 +56,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    "drari_m3asbin",
-    "rest_framework",
-    "corsheaders",
+    'drari_m3asbin',
+    'rest_framework',
+    'corsheaders',
     'channels',
     'api',
 
@@ -140,9 +140,6 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
 }
-
-
-
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
