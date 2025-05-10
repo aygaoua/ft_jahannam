@@ -16,3 +16,7 @@ class NoteSerializer(serializers.ModelSerializer):
         model = Note
         fields = ["id", "title", "content", "created_at", "author"]
         extra_kwargs = {"author": {"read_only": True}}
+
+class GameResultSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    result = serializers.ChoiceField(choices=["win", "lose", "draw"])

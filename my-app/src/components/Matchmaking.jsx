@@ -58,7 +58,7 @@ const Matchmaking = ({ username }) => {
         <div className={styles.waiting}>
           <h2>Waiting for a match...</h2>
           <p>Room: {sessionStorage.getItem('room')}</p>
-          <p>Username: {username}</p>
+          <p>Username: {sessionStorage.getItem('username')}</p>
           <p>Waiting for the other player...</p>
           <p>Click <a href="/tictactoe">here</a> if not redirected.</p>
           <p>Click <a href="/logout">here</a> to logout.</p>

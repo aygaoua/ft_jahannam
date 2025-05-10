@@ -94,7 +94,7 @@ function Form({ route, method }) {
                 sessionStorage.setItem(ACCESS_TOKEN, res.data.access);
                 sessionStorage.setItem(REFRESH_TOKEN, res.data.refresh);
                 sessionStorage.setItem("username", username);
-                navigate("/tictactoe");
+                navigate("/");
             } else {
                 navigate("/login");
             }

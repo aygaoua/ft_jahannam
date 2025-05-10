@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import styles from '../../styles/TicTacToe.module.scss';
+import axios from 'axios';
+import { ACCESS_TOKEN } from '@/constants';
+
 
 const TicTacToe = () => {
   const location = useLocation();
@@ -14,7 +17,6 @@ const TicTacToe = () => {
   const [winningCells, setWinningCells] = useState([]);
   const socket = useRef(null);
 
-  // Get room ID from URL query parameters
   const params = new URLSearchParams(location.search);
   const roomId = params.get('room');
   const username = sessionStorage.getItem('username');
@@ -25,159 +27,142 @@ const TicTacToe = () => {
       return;
     }
 
-    // Connect to WebSocket
     socket.current = new WebSocket(`ws://localhost:8000/ws/tictactoe/${roomId}/${username}/`);
 
     socket.current.onopen = () => {
       setStatusMessage('CONNECTED! WAITING FOR OPPONENT...');
     };
 
-    socket.current.onmessage = (event) => {
+    socket.current.onmessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log('Received game data:', data);
 
-      switch (data.type) {
-        case 'game_ready':
-          setStatusMessage('GAME READY! GET SET...');
-          setPlayers(data.players);
-          break;
+      if (data.type === 'game_ready') {
+        setStatusMessage('GAME READY! GET SET...');
+        setPlayers(data.players);
+      }
 
-        case 'game_state':
-          setBoard(data.board);
-          setCurrentTurn(data.current_turn);
-          setGameOver(data.game_over);
-          setWinner(data.winner);
+      if (data.type === 'game_state') {
+        setBoard(data.board);
+        setCurrentTurn(data.current_turn);
+        setGameOver(data.game_over);
+        setWinner(data.winner);
+        if (data.players) setPlayers(data.players);
 
-          if (data.players) {
-            setPlayers(data.players);
-          }
+        if (data.game_over && data.winner) {
+          const winPositions = checkWinningCells(data.board);
+          if (winPositions.length > 0) setWinningCells(winPositions);
+        }
 
-          // Check for winning cells
-          if (data.game_over && data.winner) {
-            const winPositions = checkWinningCells(data.board);
-            if (winPositions.length > 0) {
-              setWinningCells(winPositions);
-            }
-          }
-
-          if (data.game_over) {
-            if (data.winner) {
-              setStatusMessage(data.winner === username ? 'YOU WIN!' : `${data.winner} WINS!`);
-            } else {
-              setStatusMessage('DRAW GAME!');
-            }
-          } else if (data.current_turn === username) {
-            setStatusMessage('YOUR TURN');
+        if (data.game_over) {
+          if (data.winner === username) {
+            await sendGameResult('win');
+            setStatusMessage('🎉 CONGRATULATIONS! YOU WIN! 🎉');
+          } else if (data.winner) {
+            await sendGameResult('lose');
+            setStatusMessage(`GAME OVER - ${data.winner.toUpperCase()} WINS!`);
           } else {
-            setStatusMessage(`WAITING FOR ${data.current_turn.toUpperCase()}`);
+            await sendGameResult('draw');
+            setStatusMessage("IT'S A DRAW! GOOD GAME!");
           }
-          break;
+        } else {
+          setStatusMessage(
+            data.current_turn === username
+              ? '🎮 YOUR TURN - MAKE A MOVE!'
+              : `⏳ WAITING FOR ${data.current_turn.toUpperCase()}'S MOVE...`
+          );
+        }
+      }
 
-        case 'player_left':
-          setStatusMessage(`${data.username.toUpperCase()} LEFT THE GAME`);
-          // setWinner(sessionStorage.getItem('username'));
-          setGameOver(true);
-          break;
-
-        default:
-          console.log('Unknown message type:', data.type);
+      if (data.type === 'player_left') {
+        setStatusMessage(`${data.username.toUpperCase()} LEFT THE GAME`);
+        setGameOver(true);
       }
     };
 
     socket.current.onclose = () => {
-      setStatusMessage('CONNECTION LOST! RECONNECTING...');
-      // You might want to implement reconnection logic here
+      setStatusMessage('CONNECTION LOST!');
     };
 
-    socket.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setStatusMessage('CONNECTION ERROR! TRY AGAIN');
+    socket.current.onerror = () => {
+      setStatusMessage('CONNECTION ERROR!');
     };
 
     return () => {
-      if (socket.current) {
-        socket.current.close();
-      }
+      socket.current.close();
     };
   }, [roomId, username, navigate]);
 
-  // Helper function to check for winning cells
   const checkWinningCells = (boardState) => {
     const winPatterns = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-      [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
-      [0, 4, 8], [2, 4, 6]             // diagonals
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
     ];
 
-    for (const pattern of winPatterns) {
-      const [a, b, c] = pattern;
-      if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
-        return pattern;
-      }
-    }
-
-    return [];
+    return winPatterns.find(([a, b, c]) =>
+      boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]
+    ) || [];
   };
 
   const handleCellClick = (index) => {
-    // Prevent moves if not player's turn or game is over
-    if (currentTurn !== username || gameOver || board[index] !== null) {
-      return;
+    if (currentTurn !== username || gameOver || board[index]) return;
+    socket.current.send(JSON.stringify({ type: 'make_move', position: index }));
+    console.log('Move sent:', index);
+  };
+
+  const sendGameResult = async (result) => {
+    try {
+      socket.current.send(JSON.stringify({ type: 'game_over', result: result}));
+      // console.log('Game result sent:', result);
+      // ('number of wins:', );
+    } catch (error) {
+      console.error('Failed to send game result:', error);
+      // Optionally show an error message to the user
+      setStatusMessage('Error saving game result');
     }
-
-    // Send move to server
-    socket.current.send(JSON.stringify({
-      type: 'make_move',
-      position: index
-    }));
   };
 
-  const exitGame = () => {
-    navigate('/');
-  };
+  const exitGame = () => navigate('/');
 
-  // Find current player's symbol
-  const playerSymbol = players.find(player => player.username === username)?.symbol;
+  const playerSymbol = players.find(p => p.username === username)?.symbol;
 
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>TIC TAC TOE</h1>
+
       <div className={styles.status}>
         {players.length > 0 && (
           <div>
-            {players.map((player, index) => (
-              <span key={index}>
-                {player.username.toUpperCase()} ({player.symbol})
-                {player.username === username ? ' (YOU)' : ''}
-                {index === 0 && players.length > 1 ? ' VS ' : ''}
+            {players.map((p, i) => (
+              <span key={i}>
+                {p.username.toUpperCase()} ({p.symbol})
+                {p.username === username && ' (YOU)'}
+                {i === 0 && players.length > 1 && ' VS '}
               </span>
             ))}
           </div>
         )}
-        {/* <div>ROOM: {roomId}</div> */}
         <div>{statusMessage}</div>
       </div>
 
-
       <div className={styles.board}>
-          {board.map((cell, index) => (
-              <button
-                key={index}
-                className={`${styles.cell} ${winningCells.includes(index) ? styles.winningCell : ''}`}
-                onClick={() => handleCellClick(index)}
-                disabled={currentTurn !== username || gameOver || cell !== null}
-              >
-                {<span className={styles.span}>{cell}</span>}
-              </button>
-          ))}
+        {board.map((cell, i) => (
+          <button
+            key={i}
+            className={`${styles.cell} ${winningCells.includes(i) ? styles.winningCell : ''}`}
+            onClick={() => handleCellClick(i)}
+            disabled={currentTurn !== username || gameOver || cell}
+          >
+            <span className={styles.span}>{cell}</span>
+          </button>
+        ))}
       </div>
 
-      <div>
-        {(gameOver) && (
-          <button className={styles.resetButton} onClick={exitGame}>
-            EXIT GAME
-          </button>)}
-      </div>
+      {gameOver && (
+        <button className={styles.resetButton} onClick={exitGame}>
+          EXIT GAME
+        </button>
+      )}
     </div>
   );
 };

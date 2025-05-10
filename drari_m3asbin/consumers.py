@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 # In production, you might want to use Redis or another distributed solution
 WAITING_PLAYERS = []
 
+
+
 class MatchmakingConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.username = self.scope['url_route']['kwargs']['username']
@@ -198,7 +200,15 @@ class TicTacToeConsumer(AsyncWebsocketConsumer):
         message_type = data.get('type')
         
         if message_type == 'make_move':
+            print(f"Received move from {self.username}: {data}")
+            # Handle move
             await self.make_move(data)
+        elif message_type == 'game_over':
+            print(f"Game over from {self.username}: {data}")
+            # Handle game over
+            result = data.get('result')
+            if result:
+                await self.end_game(result, self.username)
     
     async def make_move(self, data):
         game = GAME_ROOMS.get(self.room_id)
@@ -318,3 +328,18 @@ class TicTacToeConsumer(AsyncWebsocketConsumer):
             'type': 'player_left',
             'username': event['username']
         }))
+
+    async def end_game(self, result, user):
+        await self.send(json.dumps({
+                'type': 'game_over',
+                'result': result,
+                'username': user
+            }
+        ))
+        if result == "win":
+            user.Profile.wins += 1
+        elif result == "draw":
+            user.Profile.draws += 1
+        elif result == "lose":
+            user.Profile.losses += 1
+        user.save()
